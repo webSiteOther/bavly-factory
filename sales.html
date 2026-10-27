@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bavly Kids - الفاتورة والمبيعات</title>
+    <script src="tailwind.min.js"></script>
+    <link href="fonts/cairo.css" rel="stylesheet">
+    <style>
+        body { font-family: 'Cairo', sans-serif; }
+
+        /* ======= شاشة عادية ======= */
+        @media screen {
+            .receipt-only { display: none !important; }
+        }
+
+        /* ======= طباعة إيصال حراري ======= */
+        @media print {
+            aside, .no-print, button, nav,
+            .print-hide, header { display: none !important; }
+
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+            html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white !important;
+                width: 80mm !important;
+                max-width: 80mm !important;
+                font-family: 'Cairo', 'Arial', sans-serif !important;
+            }
+
+            main {
+                display: none !important;
+            }
+
+            .receipt-only {
+                display: block !important;
+                width: 76mm !important;
+                margin: 0 auto !important;
+                padding: 3mm 2mm !important;
+                font-size: 11px !important;
+                color: #000 !important;
+                background: white !important;
+            }
+
+            .receipt-only * {
+                font-family: 'Cairo', 'Arial', sans-serif !important;
+                color: #000 !important;
+            }
+
+            .rcpt-header {
+                text-align: center;
+                border-bottom: 2px dashed #000;
+                padding-bottom: 4px;
+                margin-bottom: 5px;
+            }
+
+            .rcpt-header h1 {
+                font-size: 16px !important;
+                font-weight: 900 !important;
+                margin: 0 !important;
+            }
+
+            .rcpt-header p {
+                font-size: 9px !important;
+                margin: 1px 0 !important;
+            }
+
+            .rcpt-meta {
+                display: flex !important;
+                justify-content: space-between !important;
+                font-size: 9.5px !important;
+                border-bottom: 1px dashed #666;
+                padding-bottom: 3px;
+                margin-bottom: 4px;
+            }
+
+            .rcpt-table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+                font-size: 9.5px !important;
+                margin-bottom: 4px;
+            }
+
+            .rcpt-table th {
+                border-bottom: 1.5px solid #000;
+                padding: 2px 1px;
+                font-size: 9px;
+            }
+
+            .rcpt-table td {
+                padding: 2.5px 1px;
+                border-bottom: 0.5px dashed #ccc;
+            }
+
+            .rcpt-summary {
+                border-top: 1.5px dashed #000;
+                padding-top: 3px;
+                font-size: 10px !important;
+            }
+
+            .rcpt-summary .row {
+                display: flex !important;
+                justify-content: space-between !important;
+                padding: 1px 0;
+            }
+
+            .rcpt-summary .total-row {
+                font-size: 13px !important;
+                font-weight: 900 !important;
+                border-top: 2px solid #000;
+                border-bottom: 2px solid #000;
+                padding: 2px 0;
+                margin-top: 3px;
+            }
+
+            .rcpt-footer {
+                text-align: center;
+                font-size: 8.5px !important;
+                margin-top: 6px;
+                border-top: 1px dashed #000;
+                padding-top: 4px;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 flex h-screen overflow-hidden text-slate-800">
+
+    <!-- ===== إيصال الطباعة الحرارية - يظهر فقط عند الطباعة ===== -->
+    <div class="receipt-only" id="thermalReceipt">
+        <div class="rcpt-header">
+            <h1>👶 Bavly Kids</h1>
+            <p>محل ومصنع أرقى ملابس الأطفال</p>
+            <p>📞 01000000000</p>
+        </div>
+
+        <div class="rcpt-meta">
+            <span>رقم: <strong id="rcpt-invno"></strong></span>
+            <span id="rcpt-date"></span>
+        </div>
+
+        <table class="rcpt-table">
+            <thead>
+                <tr>
+                    <th style="text-align:right">كود</th>
+                    <th style="text-align:right">الصنف</th>
+                    <th style="text-align:center">كمية</th>
+                    <th style="text-align:left">سعر</th>
+                    <th style="text-align:left">إجمالي</th>
+                </tr>
+            </thead>
+            <tbody id="rcpt-items"></tbody>
+        </table>
+
+        <div class="rcpt-summary">
+            <div class="row">
+                <span>الإجمالي قبل الخصم:</span>
+                <span id="rcpt-subtotal"></span>
+            </div>
+            <div class="row" id="rcpt-discount-row" style="color:#c00">
+                <span>الخصم:</span>
+                <span id="rcpt-discount"></span>
+            </div>
+            <div class="row total-row">
+                <span>الصافي المطلوب:</span>
+                <span id="rcpt-net"></span>
+            </div>
+            <div class="row">
+                <span>المدفوع نقداً:</span>
+                <span id="rcpt-paid"></span>
+            </div>
+            <div class="row" id="rcpt-remaining-row">
+                <span>المتبقي:</span>
+                <span id="rcpt-remaining" style="font-weight:bold;color:#c00"></span>
+            </div>
+        </div>
+
+        <div class="rcpt-footer">
+            <p>شكراً لزيارتكم ونسعد بخدمتكم دائماً ❤️</p>
+            <p>الاستبدال خلال 14 يوماً مع إحضار أصل الفاتورة</p>
+        </div>
+    </div>
+
+    <!-- القائمة الجانبية (Sidebar) -->
+    <aside class="w-64 bg-slate-900 text-white flex flex-col shadow-xl shrink-0 z-20">
+        <div class="p-6 border-b border-slate-800 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span class="text-3xl">👶</span>
+                <div>
+                    <h1 class="text-xl font-extrabold text-pink-400 leading-tight">Bavly Kids</h1>
+                    <p class="text-[11px] text-slate-400">إدارة المحل والمصنع</p>
+                </div>
+            </div>
+        </div>
+
+        <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
+            <a href="index.html" class="flex items-center gap-3 py-3 px-4 rounded-xl hover:bg-slate-800 text-slate-300 font-semibold transition">
+                <span class="text-lg">📊</span>
+                <span>الشاشة الرئيسية</span>
+            </a>
+            <a href="sales.html" class="flex items-center gap-3 py-3 px-4 rounded-xl bg-pink-600 text-white font-bold shadow-md shadow-pink-600/20">
+                <span class="text-lg">🧾</span>
+                <span>الفاتورة (البيع)</span>
+            </a>
+            <a href="inventory.html" class="flex items-center gap-3 py-3 px-4 rounded-xl hover:bg-slate-800 text-slate-300 font-semibold transition">
+                <span class="text-lg">📦</span>
+                <span>المخزن والموديلات</span>
+            </a>
+            <a href="suppliers.html" class="flex items-center gap-3 py-3 px-4 rounded-xl hover:bg-slate-800 text-slate-300 font-semibold transition">
+                <span class="text-lg">🚚</span>
+                <span>فواتير وبيانات الموردين</span>
+            </a>
+            <a href="checks.html" class="flex items-center gap-3 py-3 px-4 rounded-xl hover:bg-slate-800 text-slate-300 font-semibold transition">
+                <span class="text-lg">💳</span>
+                <span>الشيكات والتسديد</span>
+            </a>
+        </nav>
+
+        <div class="p-4 border-t border-slate-800 space-y-2 text-center">
+            <button onclick="setupCloudDatabase()" class="w-full text-xs text-amber-300 hover:text-amber-200 py-2 px-2.5 rounded-xl border border-amber-500/40 hover:border-amber-400 bg-amber-500/10 font-bold transition flex items-center justify-center gap-1.5">
+                <span>🏗️</span> فحص وتهيئة الجداول
+            </button>
+            <button onclick="openSettingsModal()" class="w-full text-xs text-slate-400 hover:text-pink-300 py-1.5 px-2 rounded-xl border border-slate-700 hover:border-pink-500 transition flex items-center justify-center gap-1.5">
+                <span>⚙️</span> إعدادات رابط جوجل شيت
+            </button>
+        </div>
+    </aside>
+
+    <!-- المحتوى الرئيسي (Main Content) -->
+    <main class="flex-1 overflow-y-auto p-6 md:p-8 space-y-8">
+        
+        <!-- هيدر الصفحة والتحكم -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <div>
+                <h2 class="text-2xl font-bold text-slate-900">نقطة البيع وتسجيل الفواتير 🧾</h2>
+                <p class="text-xs text-slate-500 mt-1">إنشاء فواتير بيع سريعة مع خصم تلقائي من المخزن وطباعة إيصال حراري فوري متصل بـ Google Sheets</p>
+            </div>
+            <div class="flex items-center gap-3 flex-wrap">
+                <span class="cloud-sync-badge inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    متصل بالنظام السحابي
+                </span>
+                <button onclick="resetInvoiceForm()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                    <span>🔄</span> فاتورة جديدة
+                </button>
+            </div>
+        </div>
+
+        <!-- كارد تسجيل الفاتورة الحالية -->
+        <div class="bg-white rounded-3xl p-6 md:p-8 border border-slate-200 shadow-sm space-y-6">
+            
+            <!-- معلومات رأس الفاتورة والعميل -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">رقم الفاتورة</label>
+                    <span id="invoiceNoDisplay" class="font-mono font-extrabold text-pink-600 text-lg block">INV-1001</span>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">تاريخ الفاتورة</label>
+                    <input type="date" id="invoiceDate" class="w-full border border-slate-300 rounded-xl p-2 text-xs font-semibold focus:border-pink-500 outline-none bg-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">اسم العميل (اختياري)</label>
+                    <input type="text" id="customerName" value="عميل نقدي" placeholder="اسم العميل" class="w-full border border-slate-300 rounded-xl p-2 text-xs font-semibold focus:border-pink-500 outline-none bg-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">رقم تليفون العميل</label>
+                    <input type="text" id="customerPhone" placeholder="01xxxxxxxxx" class="w-full border border-slate-300 rounded-xl p-2 text-xs font-mono focus:border-pink-500 outline-none bg-white">
+                </div>
+            </div>
+
+            <!-- جدول الأصناف في الفاتورة -->
+            <div class="overflow-x-auto rounded-2xl border border-slate-200">
+                <table class="w-full text-right text-xs">
+                    <thead class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                        <tr>
+                            <th class="p-3 w-1/4">كود الموديل / بحث</th>
+                            <th class="p-3 w-1/3">اسم الموديل</th>
+                            <th class="p-3 w-20 text-center">الكمية</th>
+                            <th class="p-3 w-28">السعر (ج.م)</th>
+                            <th class="p-3 w-24">الخصم</th>
+                            <th class="p-3 w-28">الإجمالي</th>
+                            <th class="p-3 w-12 text-center no-print">حذف</th>
+                        </tr>
+                    </thead>
+                    <tbody id="invoiceRows" class="divide-y divide-slate-100">
+                        <!-- ديناميكي -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- زر إضافة سطر صنف جديد -->
+            <div>
+                <button type="button" onclick="addInvoiceRow()" class="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
+                    <span>+</span> إضافة صنف آخر للفاتورة
+                </button>
+            </div>
+
+            <!-- الحسابات الختامية والأزرار -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-200 items-center">
+                <!-- الدفع والمتبقي -->
+                <div class="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                    <div class="flex items-center justify-between gap-4">
+                        <label class="text-xs font-bold text-slate-700">المبلغ المدفوع (ج.م):</label>
+                        <input type="number" id="paidAmount" oninput="calculateInvoiceTotals()" placeholder="كامل المبلغ" step="0.5" class="w-40 border-2 border-slate-300 rounded-xl p-2 text-sm font-extrabold text-emerald-700 focus:border-emerald-500 outline-none bg-white text-left">
+                    </div>
+                    <div class="flex items-center justify-between gap-4">
+                        <label class="text-xs font-bold text-slate-700">المتبقي على العميل (دين):</label>
+                        <input type="text" id="remainingAmount" readonly class="w-40 border border-slate-200 rounded-xl p-2 text-sm font-bold text-rose-600 bg-slate-100 outline-none text-left">
+                    </div>
+                </div>
+
+                <!-- إجماليات الفاتورة وزر الحفظ -->
+                <div class="space-y-2 text-left">
+                    <div class="flex justify-between text-xs text-slate-500">
+                        <span>الإجمالي قبل الخصم:</span>
+                        <span id="displaySubtotal" class="font-bold text-slate-700">0.00 ج.م</span>
+                    </div>
+                    <div class="flex justify-between text-xs text-rose-600">
+                        <span>إجمالي الخصومات:</span>
+                        <span id="displayDiscountTotal" class="font-bold">- 0.00 ج.م</span>
+                    </div>
+                    <div class="flex justify-between text-lg font-extrabold text-slate-900 border-t border-slate-200 pt-2">
+                        <span>الصافي النهائي:</span>
+                        <span id="displayNetTotal" class="text-pink-600 text-2xl font-black">0.00 ج.م</span>
+                    </div>
+
+                    <div class="flex gap-3 pt-3">
+                        <button type="button" onclick="printCurrentInvoice()" class="flex-1 bg-slate-800 hover:bg-slate-900 text-white py-3 rounded-2xl font-bold text-xs transition flex items-center justify-center gap-2 shadow-sm">
+                            <span>🖨️</span> طباعة إيصال فقط
+                        </button>
+                        <button type="button" onclick="saveAndCompleteInvoice()" class="flex-2 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white py-3 px-6 rounded-2xl font-extrabold text-sm transition shadow-lg shadow-pink-600/30 flex items-center justify-center gap-2">
+                            <span>💾</span> حفظ الفاتورة وطباعة الإيصال
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- جدول الفواتير السابقة المسجلة -->
+        <div class="bg-white rounded-3xl p-6 md:p-8 border border-slate-200 shadow-sm space-y-4">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2">
+                    <span>📚</span> سجل الفواتير السابقة المسجلة
+                </h3>
+                <span class="text-xs text-slate-400">يمكنك تعديل أي فاتورة، تسديد المتبقي، طباعتها أو حذفها</span>
+            </div>
+
+            <div class="overflow-x-auto rounded-2xl border border-slate-200">
+                <table class="w-full text-right text-xs">
+                    <thead class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                        <tr>
+                            <th class="p-3">رقم الفاتورة</th>
+                            <th class="p-3">التاريخ</th>
+                            <th class="p-3">العميل</th>
+                            <th class="p-3">الهاتف</th>
+                            <th class="p-3 text-center">الأصناف</th>
+                            <th class="p-3">الصافي</th>
+                            <th class="p-3">المدفوع</th>
+                            <th class="p-3">المتبقي</th>
+                            <th class="p-3 text-center">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody id="previousInvoicesTable" class="divide-y divide-slate-100">
+                        <!-- ديناميكي -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Modal سداد متبقي فاتورة -->
+    <div id="payModal" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-md shadow-2xl space-y-5">
+            <div class="flex justify-between items-center border-b pb-3">
+                <div>
+                    <h3 class="text-xl font-bold text-slate-800">💳 تسجيل سداد متبقي</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">فاتورة رقم: <strong id="payModalInvNo" class="text-pink-600"></strong></p>
+                    <p class="text-xs text-rose-500 font-bold mt-0.5">المتبقي: <span id="payModalRemaining"></span></p>
+                </div>
+                <button onclick="closePayModal()" class="text-slate-400 hover:text-slate-600 font-bold text-lg">✕</button>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">المبلغ المسدد (ج.م) *</label>
+                <input type="number" id="payModalAmount" step="0.5" min="0.5" placeholder="0" class="w-full border-2 border-slate-300 rounded-xl p-3 text-lg font-extrabold text-emerald-700 focus:border-emerald-500 outline-none">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">طريقة الدفع</label>
+                <select id="payMethod" class="w-full border border-slate-300 rounded-xl p-2.5 text-xs font-semibold focus:border-pink-500 outline-none">
+                    <option value="cash">كاش نقدي 💵</option>
+                    <option value="instapay">انستا باي ⚡</option>
+                    <option value="vodafone">فودافون كاش 📱</option>
+                    <option value="wallet">محفظة إلكترونية 👛</option>
+                </select>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button onclick="closePayModal()" class="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-bold hover:bg-slate-100 transition">إلغاء</button>
+                <button onclick="confirmPayment()" class="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow transition">✅ تأكيد السداد</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        let currentInvoiceNumber = "";
+        let isEditingInvoice = false;
+        let payingInvoiceNo = null;
+
+        function resetInvoiceForm() {
+            isEditingInvoice = false;
+            currentInvoiceNumber = SalesDB.getNextInvoiceNo();
+            document.getElementById('invoiceNoDisplay').innerText = currentInvoiceNumber;
+            document.getElementById('invoiceDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('customerName').value = "عميل نقدي";
+            document.getElementById('customerPhone').value = "";
+            document.getElementById('paidAmount').value = "";
+
+            const tbody = document.getElementById('invoiceRows');
+            tbody.innerHTML = "";
+            addInvoiceRow();
+            calculateInvoiceTotals();
+        }
+
+        function addInvoiceRow() {
+            const tbody = document.getElementById('invoiceRows');
+            const invItems = InventoryDB.getAll();
+
+            const row = document.createElement('tr');
+            row.className = "border-b border-slate-100";
+            row.innerHTML = `
+                <td class="p-2">
+                    <input type="text" list="modelsList" onchange="onModelSelect(this)" placeholder="كود/بحث" class="item-code w-full border border-slate-300 rounded-lg p-1.5 text-xs font-mono focus:border-pink-500 outline-none">
+                    <datalist id="modelsList">
+                        ${invItems.map(i => `<option value="${i.code}">${i.name} - رصيد: ${i.qty} - سعر: ${i.sellPrice} ج.م</option>`).join('')}
+                    </datalist>
+                </td>
+                <td class="p-2">
+                    <input type="text" placeholder="اسم الموديل" class="item-name w-full border border-slate-300 rounded-lg p-1.5 text-xs focus:border-pink-500 outline-none">
+                </td>
+                <td class="p-2">
+                    <input type="number" min="1" value="1" oninput="calculateInvoiceTotals()" class="item-qty w-full border border-slate-300 rounded-lg p-1.5 text-xs text-center font-bold focus:border-pink-500 outline-none">
+                </td>
+                <td class="p-2">
+                    <input type="number" step="0.5" value="0" oninput="calculateInvoiceTotals()" class="item-price w-full border border-slate-300 rounded-lg p-1.5 text-xs font-bold text-slate-800 focus:border-pink-500 outline-none" title="يمكنك تعديل السعر يدوياً بحرية">
+                </td>
+                <td class="p-2">
+                    <input type="number" step="0.5" value="0" oninput="calculateInvoiceTotals()" class="item-discount w-full border border-rose-200 bg-rose-50/50 rounded-lg p-1.5 text-xs font-bold text-rose-600 focus:border-pink-500 outline-none" placeholder="0">
+                </td>
+                <td class="p-2 font-bold text-emerald-600 item-total text-sm">
+                    0.00 ج.م
+                </td>
+                <td class="p-2 text-center no-print">
+                    <button onclick="removeInvoiceRow(this)" class="text-rose-500 hover:text-rose-700 font-bold text-base px-2 py-1 rounded">✕</button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        }
+
+        function removeInvoiceRow(btn) {
+            const tbody = document.getElementById('invoiceRows');
+            if (tbody.children.length > 1) {
+                btn.closest('tr').remove();
+                calculateInvoiceTotals();
+            } else {
+                showToast("يجب أن تحتوي الفاتورة على صنف واحد على الأقل", "error");
+            }
+        }
+
+        function onModelSelect(input) {
+            const code = input.value.trim();
+            const invItems = InventoryDB.getAll();
+            const found = invItems.find(i => String(i.code).toLowerCase() === code.toLowerCase());
+            const row = input.closest('tr');
+            if (found) {
+                row.querySelector('.item-name').value = found.name;
+                row.querySelector('.item-price').value = found.sellPrice;
+            }
+            calculateInvoiceTotals();
+        }
+
+        function calculateInvoiceTotals() {
+            const rows = document.querySelectorAll('#invoiceRows tr');
+            let subtotal = 0;
+            let discountTotal = 0;
+
+            rows.forEach(r => {
+                const qtyInput = r.querySelector('.item-qty');
+                const priceInput = r.querySelector('.item-price');
+                const discountInput = r.querySelector('.item-discount');
+
+                const qty = parseFloat(qtyInput ? qtyInput.value : 0) || 0;
+                const price = parseFloat(priceInput ? priceInput.value : 0) || 0;
+                const discount = parseFloat(discountInput ? discountInput.value : 0) || 0;
+
+                const itemSubtotal = qty * price;
+                const itemNet = Math.max(0, itemSubtotal - discount);
+
+                subtotal += itemSubtotal;
+                discountTotal += discount;
+
+                const totalElem = r.querySelector('.item-total');
+                if (totalElem) totalElem.innerText = itemNet.toFixed(2) + ' ج.م';
+            });
+
+            const netTotal = Math.max(0, subtotal - discountTotal);
+
+            document.getElementById('displaySubtotal').innerText = subtotal.toFixed(2) + ' ج.م';
+            document.getElementById('displayDiscountTotal').innerText = '- ' + discountTotal.toFixed(2) + ' ج.م';
+            document.getElementById('displayNetTotal').innerText = netTotal.toFixed(2) + ' ج.م';
+
+            let paidInput = document.getElementById('paidAmount');
+            let paid = parseFloat(paidInput.value);
+            if (isNaN(paid) || paidInput.value === "") {
+                paid = netTotal;
+            }
+            const remaining = Math.max(0, netTotal - paid);
+            document.getElementById('remainingAmount').value = remaining.toFixed(2) + ' ج.م';
+        }
+
+        function saveAndCompleteInvoice() {
+            const rows = document.querySelectorAll('#invoiceRows tr');
+            const items = [];
+            let subtotal = 0;
+            let discountTotal = 0;
+
+            rows.forEach(r => {
+                const code = r.querySelector('.item-code') ? r.querySelector('.item-code').value.trim() : '';
+                const name = r.querySelector('.item-name') ? r.querySelector('.item-name').value.trim() : '';
+                const qty = parseFloat(r.querySelector('.item-qty') ? r.querySelector('.item-qty').value : 0) || 0;
+                const price = parseFloat(r.querySelector('.item-price') ? r.querySelector('.item-price').value : 0) || 0;
+                const discount = parseFloat(r.querySelector('.item-discount') ? r.querySelector('.item-discount').value : 0) || 0;
+                const total = Math.max(0, (qty * price) - discount);
+
+                if (name && qty > 0) {
+                    items.push({ code, name, qty, price, discount, total });
+                    subtotal += (qty * price);
+                    discountTotal += discount;
+                }
+            });
+
+            if (items.length === 0) {
+                showToast("يرجى إدخال صنف واحد على الأقل في الفاتورة", "error");
+                return;
+            }
+
+            const netTotal = Math.max(0, subtotal - discountTotal);
+            let paidVal = parseFloat(document.getElementById('paidAmount').value);
+            if (isNaN(paidVal) || document.getElementById('paidAmount').value === "") {
+                paidVal = netTotal;
+            }
+            const remaining = Math.max(0, netTotal - paidVal);
+
+            const invoiceRecord = {
+                invoiceNo: currentInvoiceNumber,
+                date: document.getElementById('invoiceDate').value,
+                customerName: document.getElementById('customerName').value.trim() || "عميل نقدي",
+                customerPhone: document.getElementById('customerPhone').value.trim() || "-",
+                items: items,
+                subtotal: subtotal,
+                discountTotal: discountTotal,
+                netTotal: netTotal,
+                paid: paidVal,
+                remaining: remaining
+            };
+
+            if (isEditingInvoice) {
+                SalesDB.update(invoiceRecord);
+                showToast(`✅ تم تحديث الفاتورة ${currentInvoiceNumber} بنجاح ومزامنتها!`);
+            } else {
+                SalesDB.save(invoiceRecord);
+                showToast(`✅ تم حفظ الفاتورة ${currentInvoiceNumber} بنجاح وخصم المخزن!`);
+            }
+
+            renderPreviousInvoices();
+
+            if (confirm("تم الحفظ بنجاح! هل ترغب في طباعة الإيصال الآن؟")) {
+                buildReceipt(invoiceRecord);
+                setTimeout(() => window.print(), 200);
+            }
+
+            resetInvoiceForm();
+        }
+
+        function editInvoice(invoiceNo) {
+            const inv = SalesDB.getAll().find(i => String(i.invoiceNo).trim() === String(invoiceNo).trim());
+            if (!inv) return;
+
+            isEditingInvoice = true;
+            currentInvoiceNumber = inv.invoiceNo;
+            document.getElementById('invoiceNoDisplay').innerText = inv.invoiceNo;
+            document.getElementById('invoiceDate').value = inv.date || new Date().toISOString().split('T')[0];
+            document.getElementById('customerName').value = inv.customerName || "عميل نقدي";
+            document.getElementById('customerPhone').value = inv.customerPhone || '';
+            document.getElementById('paidAmount').value = inv.paid;
+
+            const tbody = document.getElementById('invoiceRows');
+            tbody.innerHTML = "";
+
+            const invItems = InventoryDB.getAll();
+            (inv.items || []).forEach(item => {
+                const row = document.createElement('tr');
+                row.className = "border-b border-slate-100";
+                row.innerHTML = `
+                    <td class="p-2">
+                        <input type="text" list="modelsList" value="${item.code || ''}" onchange="onModelSelect(this)" class="item-code w-full border border-slate-300 rounded-lg p-1.5 text-xs font-mono focus:border-pink-500 outline-none">
+                    </td>
+                    <td class="p-2">
+                        <input type="text" value="${item.name || ''}" class="item-name w-full border border-slate-300 rounded-lg p-1.5 text-xs focus:border-pink-500 outline-none">
+                    </td>
+                    <td class="p-2">
+                        <input type="number" min="1" value="${item.qty || 1}" oninput="calculateInvoiceTotals()" class="item-qty w-full border border-slate-300 rounded-lg p-1.5 text-xs text-center font-bold focus:border-pink-500 outline-none">
+                    </td>
+                    <td class="p-2">
+                        <input type="number" step="0.5" value="${item.price || 0}" oninput="calculateInvoiceTotals()" class="item-price w-full border border-slate-300 rounded-lg p-1.5 text-xs font-bold text-slate-800 focus:border-pink-500 outline-none">
+                    </td>
+                    <td class="p-2">
+                        <input type="number" step="0.5" value="${item.discount || 0}" oninput="calculateInvoiceTotals()" class="item-discount w-full border border-rose-200 bg-rose-50/50 rounded-lg p-1.5 text-xs font-bold text-rose-600 focus:border-pink-500 outline-none">
+                    </td>
+                    <td class="p-2 font-bold text-emerald-600 item-total text-sm">${Number(item.total || 0).toFixed(2)} ج.م</td>
+                    <td class="p-2 text-center no-print">
+                        <button onclick="removeInvoiceRow(this)" class="text-rose-500 hover:text-rose-700 font-bold text-base px-2 py-1 rounded">✕</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            calculateInvoiceTotals();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            showToast(`📝 جاري تعديل الفاتورة ${invoiceNo} — أجرِ تعديلاتك ثم اضغط حفظ`, "info");
+        }
+
+        function deleteInvoice(invoiceNo) {
+            if (confirm(`⚠️ هل أنت متأكد من حذف الفاتورة [${invoiceNo}]؟\nسيتم إرجاع كمياتها للمخزن وحذفها من جوجل شيت.`)) {
+                SalesDB.delete(invoiceNo);
+                showToast(`🗑️ تم حذف الفاتورة [${invoiceNo}] وإرجاع الكميات للمخزن`);
+                renderPreviousInvoices();
+            }
+        }
+
+        function openPayModal(invoiceNo) {
+            payingInvoiceNo = invoiceNo;
+            const inv = SalesDB.getAll().find(i => String(i.invoiceNo).trim() === String(invoiceNo).trim());
+            if (!inv) return;
+            document.getElementById('payModalInvNo').innerText = invoiceNo;
+            document.getElementById('payModalRemaining').innerText = Number(inv.remaining).toLocaleString() + ' ج.م';
+            document.getElementById('payModalAmount').value = '';
+            document.getElementById('payModal').classList.remove('hidden');
+        }
+
+        function closePayModal() {
+            document.getElementById('payModal').classList.add('hidden');
+            payingInvoiceNo = null;
+        }
+
+        function confirmPayment() {
+            const amount = parseFloat(document.getElementById('payModalAmount').value);
+            if (!amount || amount <= 0) {
+                showToast("أدخل مبلغ صحيح", "error");
+                return;
+            }
+            const method = document.getElementById('payMethod').value;
+            SalesDB.pay(payingInvoiceNo, amount, method);
+            showToast(`✅ تم تسجيل سداد ${amount.toLocaleString()} ج.م للفاتورة`);
+            closePayModal();
+            renderPreviousInvoices();
+        }
+
+        function renderPreviousInvoices() {
+            const list = SalesDB.getAll().slice().reverse();
+            const tbody = document.getElementById('previousInvoicesTable');
+            if (!tbody) return;
+
+            if (list.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-slate-400">لا توجد فواتير سابقة مسجلة</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = list.map(inv => `
+                <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+                    <td class="p-3 font-mono font-bold text-slate-800">${inv.invoiceNo}</td>
+                    <td class="p-3 text-slate-500 text-xs">${inv.date}</td>
+                    <td class="p-3 font-semibold">${inv.customerName}</td>
+                    <td class="p-3 text-slate-500 text-xs font-mono">${inv.customerPhone || '-'}</td>
+                    <td class="p-3 text-center font-bold">${inv.items ? inv.items.length : 1} أصناف</td>
+                    <td class="p-3 font-bold text-pink-600">${Number(inv.netTotal).toLocaleString()} ج.م</td>
+                    <td class="p-3 font-bold text-emerald-600">${Number(inv.paid).toLocaleString()} ج.م</td>
+                    <td class="p-3 font-bold ${Number(inv.remaining) > 0 ? 'text-rose-600 bg-rose-50/50' : 'text-slate-400'}">${Number(inv.remaining).toLocaleString()} ج.م</td>
+                    <td class="p-3 text-center">
+                        <div class="flex items-center justify-center gap-1 flex-wrap">
+                            ${Number(inv.remaining) > 0 
+                                ? `<button onclick="openPayModal('${inv.invoiceNo}')" class="text-emerald-600 hover:text-emerald-800 font-bold text-xs bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200 transition">💳 سداد</button>` 
+                                : `<span class="text-xs text-emerald-500 font-bold">✓ مسدد</span>`}
+                            <button onclick="editInvoice('${inv.invoiceNo}')" class="text-blue-600 hover:text-blue-800 font-bold text-xs bg-blue-50 px-2 py-1 rounded-lg border border-blue-200 transition">✏️ تعديل</button>
+                            <button onclick="loadInvoiceForPrint('${inv.invoiceNo}')" class="text-indigo-600 hover:text-indigo-800 font-bold text-xs bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-200 transition">🖨️ طباعة</button>
+                            <button onclick="deleteInvoice('${inv.invoiceNo}')" class="text-rose-600 hover:text-rose-800 font-bold text-xs bg-rose-50 px-2 py-1 rounded-lg border border-rose-200 transition">🗑️ حذف</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function loadInvoiceForPrint(invoiceNo) {
+            const inv = SalesDB.getAll().find(i => String(i.invoiceNo).trim() === String(invoiceNo).trim());
+            if (!inv) return;
+            buildReceipt(inv);
+            showToast(`🖨️ جاري طباعة الفاتورة ${invoiceNo}`);
+            setTimeout(() => window.print(), 200);
+        }
+
+        function buildReceipt(invoiceData) {
+            const invNo = invoiceData ? invoiceData.invoiceNo : (document.getElementById('invoiceNoDisplay').innerText);
+            const date  = invoiceData ? invoiceData.date    : (document.getElementById('invoiceDate').value);
+
+            document.getElementById('rcpt-invno').innerText = invNo;
+            document.getElementById('rcpt-date').innerText  = date;
+
+            let items = [];
+            let subtotal = 0, discountTotal = 0;
+
+            if (invoiceData && invoiceData.items) {
+                items = invoiceData.items;
+                subtotal      = Number(invoiceData.subtotal)      || 0;
+                discountTotal = Number(invoiceData.discountTotal) || 0;
+            } else {
+                document.querySelectorAll('#invoiceRows tr').forEach(r => {
+                    const code  = r.querySelector('.item-code')     ? r.querySelector('.item-code').value.trim()     : '';
+                    const name  = r.querySelector('.item-name')     ? r.querySelector('.item-name').value.trim()     : '';
+                    const qty   = parseFloat(r.querySelector('.item-qty')?.value) || 0;
+                    const price = parseFloat(r.querySelector('.item-price')?.value) || 0;
+                    const disc  = parseFloat(r.querySelector('.item-discount')?.value) || 0;
+                    if (name && qty > 0) {
+                        items.push({ code, name, qty, price, discount: disc, total: Math.max(0, qty*price - disc) });
+                        subtotal      += qty * price;
+                        discountTotal += disc;
+                    }
+                });
+            }
+
+            const netTotal  = Math.max(0, subtotal - discountTotal);
+            const paidVal   = invoiceData ? Number(invoiceData.paid)      : (parseFloat(document.getElementById('paidAmount').value) || netTotal);
+            const remaining = invoiceData ? Number(invoiceData.remaining) : Math.max(0, netTotal - paidVal);
+
+            const tbody = document.getElementById('rcpt-items');
+            tbody.innerHTML = items.map(it => `
+                <tr>
+                    <td>${it.code || '-'}</td>
+                    <td>${it.name}</td>
+                    <td style="text-align:center">${it.qty}</td>
+                    <td style="text-align:left">${Number(it.price).toLocaleString()}</td>
+                    <td style="text-align:left;font-weight:700">${Number(it.total).toLocaleString()}</td>
+                </tr>
+            `).join('');
+
+            document.getElementById('rcpt-subtotal').innerText = subtotal.toLocaleString() + ' ج.م';
+            document.getElementById('rcpt-discount').innerText = discountTotal.toLocaleString() + ' ج.م';
+            document.getElementById('rcpt-discount-row').style.display = discountTotal > 0 ? '' : 'none';
+            document.getElementById('rcpt-net').innerText       = netTotal.toLocaleString()  + ' ج.م';
+            document.getElementById('rcpt-paid').innerText      = paidVal.toLocaleString()   + ' ج.م';
+            document.getElementById('rcpt-remaining').innerText = remaining.toLocaleString() + ' ج.م';
+            document.getElementById('rcpt-remaining-row').style.display = remaining > 0 ? '' : 'none';
+        }
+
+        function printCurrentInvoice() {
+            buildReceipt(null);
+            window.print();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            resetInvoiceForm();
+            renderPreviousInvoices();
+        });
+
+        window.addEventListener('bavly-data-synced', () => {
+            renderPreviousInvoices();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bavly Kids - الشيكات والتسديد وكشف حساب الموردين</title>
+    <script src="tailwind.min.js"></script>
+    <link href="fonts/cairo.css" rel="stylesheet">
+    <style>body { font-family: 'Cairo', sans-serif; }</style>
+</head>
+<body class="bg-slate-50 flex h-screen overflow-hidden text-slate-800">
+
+    <!-- القائمة الجانبية (Sidebar) -->
+    <aside class="w-64 bg-slate-900 text-white flex flex-col shadow-xl shrink-0 z-20">
+        <div class="p-6 border-b border-slate-800 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span class="text-3xl">👶</span>
+                <div>
+                    <h1 class="text-xl font-extrabold text-pink-400 leading-tight">Bavly Kids</h1>
+                    <p class="text-[11px] text-slate-400">إدارة المحل والمصنع</p>
+                </div>
+            </div>
+        </div>
+
+        <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
+            <a href="index.html" class="flex items-center gap-3 py-3 px-4 rounded-xl hover:bg-slate-800 text-slate-300 font-semibold transition">
+                <span class="text-lg">📊</span>
+                <span>الشاشة الرئيسية</span>
+            </a>
+            <a href="sales.html" class="flex items-center gap-3 py-3 px-4 rounded-xl hover:bg-slate-800 text-slate-300 font-semibold transition">
+                <span class="text-lg">🧾</span>
+                <span>الفاتورة (البيع)</span>
+            </a>
+            <a href="inventory.html" class="flex items-center gap-3 py-3 px-4 rounded-xl hover:bg-slate-800 text-slate-300 font-semibold transition">
+                <span class="text-lg">📦</span>
+                <span>المخزن والموديلات</span>
+            </a>
+            <a href="suppliers.html" class="flex items-center gap-3 py-3 px-4 rounded-xl hover:bg-slate-800 text-slate-300 font-semibold transition">
+                <span class="text-lg">🚚</span>
+                <span>فواتير وبيانات الموردين</span>
+            </a>
+            <a href="checks.html" class="flex items-center gap-3 py-3 px-4 rounded-xl bg-pink-600 text-white font-bold shadow-md shadow-pink-600/20">
+                <span class="text-lg">💳</span>
+                <span>الشيكات والتسديد</span>
+            </a>
+        </nav>
+
+        <div class="p-4 border-t border-slate-800 space-y-2 text-center">
+            <button onclick="setupCloudDatabase()" class="w-full text-xs text-amber-300 hover:text-amber-200 py-2 px-2.5 rounded-xl border border-amber-500/40 hover:border-amber-400 bg-amber-500/10 font-bold transition flex items-center justify-center gap-1.5">
+                <span>🏗️</span> فحص وتهيئة الجداول
+            </button>
+            <button onclick="openSettingsModal()" class="w-full text-xs text-slate-400 hover:text-pink-300 py-1.5 px-2 rounded-xl border border-slate-700 hover:border-pink-500 transition flex items-center justify-center gap-1.5">
+                <span>⚙️</span> إعدادات رابط جوجل شيت
+            </button>
+        </div>
+    </aside>
+
+    <!-- المحتوى الرئيسي (Main Content) -->
+    <main class="flex-1 overflow-y-auto p-6 md:p-8 space-y-8">
+        
+        <!-- هيدر الصفحة والزر -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <div>
+                <h2 class="text-2xl font-bold text-slate-900">إدارة الشيكات والتسديد وكشف الحساب 💳</h2>
+                <p class="text-xs text-slate-500 mt-1">متابعة الشيكات ومواعيد استحقاقها وربط كل مورد بفواتيره ومستحقاته مع Google Sheets</p>
+            </div>
+            <div class="flex items-center gap-3 flex-wrap">
+                <span class="cloud-sync-badge inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    متصل بالنظام السحابي
+                </span>
+                <button onclick="openCheckModal()" class="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-bold transition flex items-center gap-2 shadow-lg shadow-slate-900/20 text-xs">
+                    <span>+</span> إضافة شيك بنكي جديد
+                </button>
+            </div>
+        </div>
+
+        <!-- كارد التنبيه المالي: أنا عليا كام للموردين -->
+        <div class="bg-gradient-to-r from-rose-500 to-pink-600 text-white p-6 rounded-3xl shadow-xl flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div>
+                <span class="text-xs font-bold text-rose-100 uppercase tracking-wider block">إجمالي مستحقات الموردين المؤجلة (عليّ كام حالياً)</span>
+                <h3 id="totalOwedAmount" class="text-3xl font-black mt-1">0 ج.م</h3>
+                <p class="text-[11px] text-rose-100 mt-1">تشمل باقي حسابات فواتير الشراء غير المسددة</p>
+            </div>
+            <a href="suppliers.html" class="bg-white text-rose-600 hover:bg-rose-50 font-bold px-5 py-2.5 rounded-xl text-xs transition shadow">
+                تفاصيل فواتير الموردين ←
+            </a>
+        </div>
+
+        <!-- جدول الشيكات البنكية -->
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden space-y-4 p-6">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2">
+                    <span>🏦</span> سجل الشيكات البنكية الصادرة
+                </h3>
+                <span class="text-xs text-slate-400">يمكنك إضافة، تعديل، تسديد، أو حذف أي شيك</span>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-right text-xs">
+                    <thead class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                        <tr>
+                            <th class="p-4">رقم الشيك</th>
+                            <th class="p-4">البنك المسحوب عليه</th>
+                            <th class="p-4">المستفيد (المورد)</th>
+                            <th class="p-4">تاريخ الاستحقاق</th>
+                            <th class="p-4">مبلغ الشيك</th>
+                            <th class="p-4">المدفوع</th>
+                            <th class="p-4">المتبقي</th>
+                            <th class="p-4">الحالة</th>
+                            <th class="p-4 text-center">صورة الشيك</th>
+                            <th class="p-4 text-center">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody id="checksTableBody" class="divide-y divide-slate-100">
+                        <!-- ديناميكي -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- قسم كشف حساب مورد تفصيلي -->
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-6">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4">
+                <div>
+                    <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2">
+                        <span>📑</span> كشف حساب تفصيلي لمورد محدد
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-0.5">اختر المورد لعرض فواتيره، إجمالي مشترياته، والمسدد والمتبقي له</p>
+                </div>
+
+                <div class="w-full sm:w-72">
+                    <select id="supplierSelect" onchange="renderSupplierStatement()" class="w-full border-2 border-slate-200 rounded-xl p-2.5 text-xs font-bold text-slate-800 focus:border-pink-500 outline-none bg-slate-50">
+                        <!-- خيارات الموردين -->
+                    </select>
+                </div>
+            </div>
+
+            <!-- ملخص الحساب للمورد المختار -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                    <span class="text-xs text-slate-500 block font-bold">إجمالي الفواتير للمورد:</span>
+                    <strong id="supSumTotal" class="text-lg font-extrabold text-slate-800 mt-1 block">0 ج.م</strong>
+                </div>
+                <div class="bg-emerald-50 p-4 rounded-2xl border border-emerald-200">
+                    <span class="text-xs text-emerald-700 block font-bold">إجمالي المدفوع له:</span>
+                    <strong id="supSumPaid" class="text-lg font-extrabold text-emerald-700 mt-1 block">0 ج.م</strong>
+                </div>
+                <div class="bg-rose-50 p-4 rounded-2xl border border-rose-200">
+                    <span class="text-xs text-rose-700 block font-bold">المتبقي له حالياً:</span>
+                    <strong id="supSumRemaining" class="text-lg font-extrabold text-rose-700 mt-1 block">0 ج.م</strong>
+                </div>
+            </div>
+
+            <!-- جدول فواتير المورد في كشف الحساب -->
+            <div class="overflow-x-auto rounded-2xl border border-slate-200">
+                <table class="w-full text-right text-xs">
+                    <thead class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                        <tr>
+                            <th class="p-3">رقم الفاتورة</th>
+                            <th class="p-3">التاريخ</th>
+                            <th class="p-3 text-center">الكمية</th>
+                            <th class="p-3">إجمالي الفاتورة</th>
+                            <th class="p-3">المدفوع</th>
+                            <th class="p-3">المتبقي</th>
+                        </tr>
+                    </thead>
+                    <tbody id="supInvoicesBody" class="divide-y divide-slate-100">
+                        <!-- ديناميكي -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Modal إضافة / تعديل شيك بنكي -->
+    <div id="checkModal" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-lg shadow-2xl space-y-6">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 id="checkModalTitle" class="text-xl font-bold text-slate-800">إضافة شيك بنكي جديد 💳</h3>
+                <button onclick="closeCheckModal()" class="text-slate-400 hover:text-slate-600 font-bold text-lg">✕</button>
+            </div>
+
+            <form id="checkForm" onsubmit="handleCheckSubmit(event)" class="space-y-4">
+                <input type="hidden" id="editingOldCheckNo" value="">
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">رقم الشيك *</label>
+                        <input type="text" id="chkNo" required placeholder="مثال: CHK-1005" class="w-full border border-slate-300 rounded-xl p-2.5 text-xs font-mono font-bold focus:border-pink-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">البنك المسحوب عليه *</label>
+                        <input type="text" id="chkBank" required placeholder="مثال: البنك الأهلي المصري / بنك مصر" class="w-full border border-slate-300 rounded-xl p-2.5 text-xs font-semibold focus:border-pink-500 outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">المستفيد (اسم المورد أو المصنع) *</label>
+                    <input type="text" id="chkSupplier" list="suppliersDatalist" required placeholder="اكتب أو اختر اسم المورد" class="w-full border border-slate-300 rounded-xl p-2.5 text-xs font-semibold focus:border-pink-500 outline-none">
+                    <datalist id="suppliersDatalist"></datalist>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">تاريخ تحرير الشيك</label>
+                        <input type="date" id="chkIssueDate" class="w-full border border-slate-300 rounded-xl p-2.5 text-xs font-semibold focus:border-pink-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">تاريخ الاستحقاق (الصرف) *</label>
+                        <input type="date" id="chkDueDate" required class="w-full border-2 border-rose-300 rounded-xl p-2.5 text-xs font-bold focus:border-rose-500 outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">مبلغ الشيك الإجمالي (ج.م) *</label>
+                        <input type="number" id="chkTotal" step="0.5" required min="1" placeholder="0" class="w-full border border-slate-300 rounded-xl p-2.5 text-xs font-bold focus:border-pink-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">المبلغ المدفوع منه (ج.م)</label>
+                        <input type="number" id="chkPaid" step="0.5" min="0" placeholder="0" class="w-full border border-slate-300 rounded-xl p-2.5 text-xs font-bold text-emerald-600 focus:border-pink-500 outline-none">
+                    </div>
+                </div>
+
+                <div class="border-2 border-dashed border-slate-200 rounded-2xl p-4 text-center hover:border-pink-400 transition">
+                    <label class="block text-xs font-bold text-slate-700 mb-2">📸 تصوير أو رفع صورة الشيك الورقي (اختياري)</label>
+                    <input type="file" id="chkImageInput" accept="image/*" onchange="previewCheckImage(event)" class="text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100">
+                    <div id="chkImagePreviewContainer" class="hidden mt-3">
+                        <img id="chkImagePreview" src="" class="max-h-32 mx-auto rounded-xl shadow border border-slate-200">
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-3">
+                    <button type="button" onclick="closeCheckModal()" class="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-bold hover:bg-slate-100 transition">إلغاء</button>
+                    <button type="submit" class="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-lg shadow-slate-900/20 transition">حفظ الشيك</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal عرض صورة الشيك بالحجم الكامل -->
+    <div id="viewImageModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="relative max-w-3xl w-full text-center">
+            <button onclick="closeImageViewer()" class="absolute -top-10 left-0 text-white text-2xl font-bold bg-slate-800/80 px-3 py-1 rounded-full">✕ إغلاق</button>
+            <img id="modalFullImage" src="" class="max-h-[85vh] mx-auto rounded-2xl shadow-2xl border-2 border-white">
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        let checkImageBase64 = "";
+
+        function renderOwedDebt() {
+            const totalDebt = SupplierDB.getTotalDebt();
+            const elem = document.getElementById('totalOwedAmount');
+            if (elem) elem.innerText = Number(totalDebt).toLocaleString() + ' ج.م';
+        }
+
+        function renderChecks() {
+            const list = CheckDB.getAll();
+            const tbody = document.getElementById('checksTableBody');
+            if (!tbody) return;
+
+            if (list.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="10" class="p-8 text-center text-slate-400">لا توجد شيكات بنكية مسجلة</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = list.map(c => {
+                const total = Number(c.total) || 0;
+                const paid = Number(c.paid) || 0;
+                const rem = Math.max(0, total - paid);
+
+                let statusBadge = '';
+                if (rem === 0) {
+                    statusBadge = '<span class="bg-emerald-100 text-emerald-800 text-xs px-3 py-1 rounded-full font-bold">تم التسديد ✅</span>';
+                } else if (paid > 0) {
+                    statusBadge = '<span class="bg-amber-100 text-amber-800 text-xs px-3 py-1 rounded-full font-bold">جاري التسديد ⏳</span>';
+                } else {
+                    statusBadge = '<span class="bg-rose-100 text-rose-800 text-xs px-3 py-1 rounded-full font-bold">لم يسدد ❌</span>';
+                }
+
+                const imgCell = c.imageUrl ? `
+                    <img src="${c.imageUrl}" onclick="viewFullImage('${c.imageUrl}')" class="w-10 h-10 object-cover rounded-lg border border-slate-300 cursor-pointer hover:opacity-80 mx-auto" title="اضغط للتكبير">
+                ` : `<span class="text-xs text-slate-400 italic">بدون صورة</span>`;
+
+                return `
+                    <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+                        <td class="p-4 font-mono font-bold text-slate-900">${c.checkNo}</td>
+                        <td class="p-4 font-semibold">${c.bank}</td>
+                        <td class="p-4 font-bold text-slate-800">${c.supplierName}</td>
+                        <td class="p-4 font-bold text-rose-600">${c.dueDate}</td>
+                        <td class="p-4 font-extrabold text-slate-900">${total.toLocaleString()} ج.م</td>
+                        <td class="p-4 font-bold text-emerald-600">${paid.toLocaleString()} ج.م</td>
+                        <td class="p-4 font-extrabold text-rose-600 bg-rose-50/50">${rem.toLocaleString()} ج.م</td>
+                        <td class="p-4">${statusBadge}</td>
+                        <td class="p-4 text-center">${imgCell}</td>
+                        <td class="p-4 text-center">
+                            <div class="flex items-center justify-center gap-1.5 flex-wrap">
+                                ${rem > 0 
+                                    ? `<button onclick="promptPayCheck('${c.checkNo}')" class="text-emerald-600 hover:text-emerald-800 font-bold text-xs bg-emerald-50 px-2 py-1.5 rounded-lg border border-emerald-200 transition">💳 دفع دفعة</button>`
+                                    : `<span class="text-xs text-emerald-500 font-bold">✓ مسدد</span>`
+                                }
+                                <button onclick="editCheck('${c.checkNo}')" class="text-blue-600 hover:text-blue-800 font-bold text-xs bg-blue-50 px-2 py-1.5 rounded-lg border border-blue-200 transition">✏️ تعديل</button>
+                                <button onclick="deleteCheck('${c.checkNo}')" class="text-rose-600 hover:text-rose-800 font-bold text-xs bg-rose-50 px-2 py-1.5 rounded-lg border border-rose-200 transition">🗑️ حذف</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function initSupplierStatement() {
+            const invoices = SupplierDB.getAll();
+            const suppliers = [...new Set(invoices.map(i => i.supplierName).filter(Boolean))];
+            const select = document.getElementById('supplierSelect');
+            const datalist = document.getElementById('suppliersDatalist');
+
+            if (!select) return;
+
+            if (suppliers.length === 0) {
+                select.innerHTML = '<option value="">لا يوجد موردين مسجلين بعد</option>';
+                if (datalist) datalist.innerHTML = '';
+                return;
+            }
+
+            select.innerHTML = suppliers.map(s => `<option value="${s}">${s}</option>`).join('');
+            if (datalist) datalist.innerHTML = suppliers.map(s => `<option value="${s}">`).join('');
+            renderSupplierStatement();
+        }
+
+        function renderSupplierStatement() {
+            const select = document.getElementById('supplierSelect');
+            if (!select) return;
+            const supName = select.value;
+            if (!supName) return;
+
+            const allInvoices = SupplierDB.getAll().filter(i => i.supplierName === supName);
+            const totalSum = allInvoices.reduce((s, i) => s + (Number(i.total) || 0), 0);
+            const paidSum = allInvoices.reduce((s, i) => s + (Number(i.paid) || 0), 0);
+            const remSum = allInvoices.reduce((s, i) => s + (Number(i.remaining) || 0), 0);
+
+            document.getElementById('supSumTotal').innerText = `${totalSum.toLocaleString()} ج.م`;
+            document.getElementById('supSumPaid').innerText = `${paidSum.toLocaleString()} ج.م`;
+            document.getElementById('supSumRemaining').innerText = `${remSum.toLocaleString()} ج.م`;
+
+            const tbody = document.getElementById('supInvoicesBody');
+            if (!tbody) return;
+
+            if (allInvoices.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">لا توجد فواتير لهذا المورد</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = allInvoices.map(inv => `
+                <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+                    <td class="p-3 font-mono font-bold">${inv.invoiceNo}</td>
+                    <td class="p-3 text-slate-500">${inv.date}</td>
+                    <td class="p-3 text-center font-bold">${inv.qty} قطعة</td>
+                    <td class="p-3 font-extrabold text-slate-800">${Number(inv.total).toLocaleString()} ج.م</td>
+                    <td class="p-3 text-emerald-600 font-bold">${Number(inv.paid).toLocaleString()} ج.م</td>
+                    <td class="p-3 text-rose-600 font-bold">${Number(inv.remaining).toLocaleString()} ج.م</td>
+                </tr>
+            `).join('');
+        }
+
+        function openCheckModal() {
+            document.getElementById('checkForm').reset();
+            document.getElementById('editingOldCheckNo').value = "";
+            document.getElementById('checkModalTitle').innerText = "إضافة شيك بنكي جديد 💳";
+            document.getElementById('chkNo').readOnly = false;
+            document.getElementById('chkIssueDate').value = new Date().toISOString().split('T')[0];
+            checkImageBase64 = "";
+            document.getElementById('chkImagePreviewContainer').classList.add('hidden');
+            document.getElementById('checkModal').classList.remove('hidden');
+        }
+
+        function closeCheckModal() {
+            document.getElementById('checkModal').classList.add('hidden');
+        }
+
+        function editCheck(checkNo) {
+            const chk = CheckDB.getAll().find(c => String(c.checkNo).trim() === String(checkNo).trim());
+            if (!chk) return;
+
+            document.getElementById('checkModalTitle').innerText = "تعديل الشيك: " + chk.checkNo;
+            document.getElementById('editingOldCheckNo').value = chk.checkNo;
+            document.getElementById('chkNo').value = chk.checkNo;
+            document.getElementById('chkNo').readOnly = true;
+            document.getElementById('chkBank').value = chk.bank || '';
+            document.getElementById('chkSupplier').value = chk.supplierName || '';
+            document.getElementById('chkIssueDate').value = chk.issueDate || '';
+            document.getElementById('chkDueDate').value = chk.dueDate || '';
+            document.getElementById('chkTotal').value = chk.total || '';
+            document.getElementById('chkPaid').value = chk.paid || '';
+
+            checkImageBase64 = chk.imageUrl || '';
+            if (chk.imageUrl) {
+                document.getElementById('chkImagePreview').src = chk.imageUrl;
+                document.getElementById('chkImagePreviewContainer').classList.remove('hidden');
+            } else {
+                document.getElementById('chkImagePreviewContainer').classList.add('hidden');
+            }
+
+            document.getElementById('checkModal').classList.remove('hidden');
+            showToast(`📝 تعديل الشيك [${checkNo}] — عدّل البيانات ثم اضغط حفظ`, "info");
+        }
+
+        function deleteCheck(checkNo) {
+            if (confirm(`⚠️ هل أنت متأكد من حذف الشيك البنكي رقم [${checkNo}]؟\nسيتم حذفه من الحسابات وجوجل شيت.`)) {
+                CheckDB.delete(checkNo);
+                showToast(`🗑️ تم حذف الشيك [${checkNo}]`);
+                renderChecks();
+                renderOwedDebt();
+            }
+        }
+
+        function previewCheckImage(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    checkImageBase64 = evt.target.result;
+                    document.getElementById('chkImagePreview').src = evt.target.result;
+                    document.getElementById('chkImagePreviewContainer').classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function handleCheckSubmit(e) {
+            e.preventDefault();
+
+            const total = parseFloat(document.getElementById('chkTotal').value) || 0;
+            const paid = parseFloat(document.getElementById('chkPaid').value) || 0;
+            const remaining = Math.max(0, total - paid);
+            let status = "لم يسدد";
+            if (remaining === 0) status = "تم التسديد";
+            else if (paid > 0) status = "جاري التسديد";
+
+            const check = {
+                checkNo: document.getElementById('chkNo').value.trim(),
+                bank: document.getElementById('chkBank').value.trim(),
+                supplierName: document.getElementById('chkSupplier').value.trim(),
+                issueDate: document.getElementById('chkIssueDate').value,
+                dueDate: document.getElementById('chkDueDate').value,
+                total: total,
+                paid: paid,
+                remaining: remaining,
+                status: status,
+                imageUrl: checkImageBase64,
+                imageBase64: checkImageBase64
+            };
+
+            CheckDB.save(check);
+            showToast(`✅ تم حفظ الشيك ${check.checkNo} بنجاح ومزامنة جوجل شيت!`);
+            closeCheckModal();
+            renderChecks();
+            renderOwedDebt();
+            initSupplierStatement();
+        }
+
+        function promptPayCheck(checkNo) {
+            const amount = parseFloat(prompt(`أدخل المبلغ المسدد للشيك [${checkNo}]:`));
+            if (amount && amount > 0) {
+                CheckDB.pay(checkNo, amount);
+                showToast(`✅ تم تسجيل دفعة بقيمة ${amount.toLocaleString()} ج.م للشيك`);
+                renderChecks();
+                renderOwedDebt();
+            }
+        }
+
+        function viewFullImage(src) {
+            document.getElementById('modalFullImage').src = src;
+            document.getElementById('viewImageModal').classList.remove('hidden');
+        }
+
+        function closeImageViewer() {
+            document.getElementById('viewImageModal').classList.add('hidden');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderOwedDebt();
+            renderChecks();
+            initSupplierStatement();
+        });
+
+        window.addEventListener('bavly-data-synced', () => {
+            renderOwedDebt();
+            renderChecks();
+            initSupplierStatement();
+        });
+    </script>
+</body>
+</html>

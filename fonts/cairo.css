@@ -1,0 +1,24 @@
+@font-face {
+    font-family: 'Cairo';
+    font-style: normal;
+    font-weight: 400;
+    src: url('cairo-400.ttf') format('truetype');
+}
+@font-face {
+    font-family: 'Cairo';
+    font-style: normal;
+    font-weight: 600;
+    src: url('cairo-600.ttf') format('truetype');
+}
+@font-face {
+    font-family: 'Cairo';
+    font-style: normal;
+    font-weight: 700;
+    src: url('cairo-700.ttf') format('truetype');
+}
+@font-face {
+    font-family: 'Cairo';
+    font-style: normal;
+    font-weight: 800;
+    src: url('cairo-800.ttf') format('truetype');
+}
